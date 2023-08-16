@@ -1,4 +1,4 @@
-import { Context, Schema, Service, Fragment, SendOptions, Bot } from 'koishi'
+import { Bot, Context, Fragment, Schema, SendOptions, Service } from 'koishi'
 
 declare module 'koishi' {
   interface Context {
@@ -14,6 +14,7 @@ function parsePlatform(channel: string | Send.Channel) {
     platform = channel.slice(0, index)
     channelId = channel.slice(index + 1)
   } else {
+    // eslint-disable-next-line no-empty-pattern
     const {} = { platform, channelId } = channel
   }
   return [platform, channelId]
@@ -30,8 +31,7 @@ class Send extends Service {
   async sendPrivateMessage(channel: string | Send.Channel, content: Fragment, options?: SendOptions) {
     let bot: Bot
     const [platform, channelId] = parsePlatform(channel)
-    if (platform.includes(':'))
-      bot = this.ctx.bots[platform]
+    if (platform.includes(':')) { bot = this.ctx.bots[platform] }
     if (!bot) {
       bot = this.ctx.bots.find(b => b.platform === platform)
     }
@@ -41,8 +41,7 @@ class Send extends Service {
   async sendMessage(channel: string | Send.Channel, content: Fragment, guildId?: string, options?: SendOptions) {
     let bot: Bot
     const [platform, channelId] = parsePlatform(channel)
-    if (platform.includes(':'))
-      bot = this.ctx.bots[platform]
+    if (platform.includes(':')) { bot = this.ctx.bots[platform] }
     if (!bot) {
       const { assignee } = (await this.ctx.database.getChannel(platform, channelId, ['assignee'])) || {}
       bot ||= this.ctx.bots[`${platform}:${assignee}`]
@@ -50,7 +49,6 @@ class Send extends Service {
     }
     if (bot) return await bot.sendMessage(channelId, content, guildId, options)
   }
-
 }
 
 namespace Send {

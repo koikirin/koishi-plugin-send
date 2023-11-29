@@ -1,9 +1,9 @@
-import { Bot, Context, Fragment, Schema, SendOptions, Service } from 'koishi'
+import { Bot, Context, Fragment, Schema, Universal } from 'koishi'
 
 declare module 'koishi' {
   interface Context {
-    sendPrivateMessage(channel: string | Send.Channel, content: Fragment, options?: SendOptions): Promise<string[]>
-    sendMessage(channel: string | Send.Channel, content: Fragment, guildId?: string, options?: SendOptions): Promise<string[]>
+    sendPrivateMessage(channel: string | Send.Channel, content: Fragment, options?: Universal.SendOptions): Promise<string[]>
+    sendMessage(channel: string | Send.Channel, content: Fragment, guildId?: string, options?: Universal.SendOptions): Promise<string[]>
   }
 }
 
@@ -20,25 +20,34 @@ function parsePlatform(channel: string | Send.Channel) {
   return [platform, channelId]
 }
 
-class Send extends Service {
-  static readonly methods = ['sendPrivateMessage', 'sendMessage']
-  static readonly using = ['database']
+class Send {
+  static filter = false
+  static inject = ['database']
 
-  constructor(ctx: Context, private config: Send.Config) {
-    super(ctx, '__send__', true)
+  constructor(private ctx: Context, private config: Send.Config) {
+    ctx.root.provide('sendPrivateMessage')
+    ctx.root.provide('sendMessage')
+
+    ctx.sendPrivateMessage = this.sendPrivateMessage.bind(this)
+    ctx.sendMessage = this.sendMessage.bind(this)
+
+    ctx.on('dispose', () => {
+      ctx.sendPrivateMessage = null
+      ctx.sendMessage = null
+    })
   }
 
-  async sendPrivateMessage(channel: string | Send.Channel, content: Fragment, options?: SendOptions) {
+  async sendPrivateMessage(channel: string | Send.Channel, content: Fragment, options?: Universal.SendOptions) {
     let bot: Bot
     const [platform, channelId] = parsePlatform(channel)
     if (platform.includes(':')) { bot = this.ctx.bots[platform] }
     if (!bot) {
       bot = this.ctx.bots.find(b => b.platform === platform)
     }
-    if (bot) return await bot.sendPrivateMessage(channelId, content, options)
+    if (bot) return await bot.sendPrivateMessage(channelId, content, '', options)
   }
 
-  async sendMessage(channel: string | Send.Channel, content: Fragment, guildId?: string, options?: SendOptions) {
+  async sendMessage(channel: string | Send.Channel, content: Fragment, guildId?: string, options?: Universal.SendOptions) {
     let bot: Bot
     const [platform, channelId] = parsePlatform(channel)
     if (platform.includes(':')) { bot = this.ctx.bots[platform] }
@@ -61,7 +70,5 @@ namespace Send {
     channelId: string
   }
 }
-
-Context.service('__send__', Send)
 
 export default Send

@@ -5,6 +5,31 @@ declare module 'koishi' {
     sendPrivateMessage(channel: string | Send.Channel, content: Fragment, options?: Universal.SendOptions): Promise<string[]>
     sendMessage(channel: string | Send.Channel, content: Fragment, guildId?: string, options?: Universal.SendOptions): Promise<string[]>
   }
+
+  namespace Universal {
+      interface SendOptions {
+          source?: string
+      }
+  }
+
+  interface Events {
+    'send/sendPrivateMessage'(
+      caller: Context,
+      candidate: Bot,
+      channel: Send.Channel,
+      content: Fragment,
+      options?: Universal.SendOptions
+    ): Promise<Bot>
+
+    'send/sendMessage'(
+      caller: Context,
+      candidate: Bot,
+      channel: Send.Channel,
+      content: Fragment,
+      guildId?: string,
+      options?: Universal.SendOptions
+    ): Promise<Bot>
+  }
 }
 
 function parsePlatform(channel: string | Send.Channel) {
@@ -24,40 +49,37 @@ class Send {
   static filter = false
   static inject = ['database']
 
-  constructor(private ctx: Context, private config: Send.Config) {
-    ctx.root.provide('sendPrivateMessage')
-    ctx.root.provide('sendMessage')
+  constructor(ctx: Context) {
+    ctx.provide('sendPrivateMessage')
+    ctx.provide('sendMessage')
 
-    ctx.sendPrivateMessage = this.sendPrivateMessage.bind(this)
-    ctx.sendMessage = this.sendMessage.bind(this)
-
-    ctx.on('dispose', () => {
-      ctx.sendPrivateMessage = null
-      ctx.sendMessage = null
-    })
+    ctx.sendPrivateMessage = sendPrivateMessage
+    ctx.sendMessage = sendMessage
   }
+}
 
-  async sendPrivateMessage(channel: string | Send.Channel, content: Fragment, options?: Universal.SendOptions) {
-    let bot: Bot
-    const [platform, channelId] = parsePlatform(channel)
-    if (platform.includes(':')) { bot = this.ctx.bots[platform] }
-    if (!bot) {
-      bot = this.ctx.bots.find(b => b.platform === platform)
-    }
-    if (bot) return await bot.sendPrivateMessage(channelId, content, '', options)
+async function sendPrivateMessage(this: Context, channel: string | Send.Channel, content: Fragment, options: Universal.SendOptions = {}) {
+  let bot: Bot
+  const [platform, channelId] = parsePlatform(channel)
+  if (platform.includes(':')) { bot = this.bots[platform] }
+  if (!bot) {
+    bot = this.bots.find(b => b.platform === platform)
   }
+  bot = await this.serial('send/sendPrivateMessage', this, bot as any, { platform, channelId }, content, options)
+  if (bot) return await bot.sendPrivateMessage(channelId, content, '', options)
+}
 
-  async sendMessage(channel: string | Send.Channel, content: Fragment, guildId?: string, options?: Universal.SendOptions) {
-    let bot: Bot
-    const [platform, channelId] = parsePlatform(channel)
-    if (platform.includes(':')) { bot = this.ctx.bots[platform] }
-    if (!bot) {
-      const { assignee } = (await this.ctx.database.getChannel(platform, channelId, ['assignee'])) || {}
-      bot ||= this.ctx.bots[`${platform}:${assignee}`]
-      bot ||= this.ctx.bots.find(b => b.platform === platform)
-    }
-    if (bot) return await bot.sendMessage(channelId, content, guildId, options)
+async function sendMessage(this: Context, channel: string | Send.Channel, content: Fragment, guildId?: string, options: Universal.SendOptions = {}) {
+  let bot: Bot
+  const [platform, channelId] = parsePlatform(channel)
+  if (platform.includes(':')) { bot = this.bots[platform] }
+  if (!bot) {
+    const { assignee } = (await this.database.getChannel(platform, channelId, ['assignee'])) || {}
+    bot ||= this.bots[`${platform}:${assignee}`]
+    bot ||= this.bots.find(b => b.platform === platform)
   }
+  bot = await this.serial('send/sendMessage', this, bot as any, { platform, channelId }, content, guildId, options)
+  if (bot) return await bot.sendMessage(channelId, content, guildId, options)
 }
 
 namespace Send {

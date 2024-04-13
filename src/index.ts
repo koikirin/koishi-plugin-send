@@ -50,11 +50,8 @@ class Send {
   static inject = ['database']
 
   constructor(ctx: Context) {
-    ctx.provide('sendPrivateMessage')
-    ctx.provide('sendMessage')
-
-    ctx.sendPrivateMessage = sendPrivateMessage
-    ctx.sendMessage = sendMessage
+    ctx.set('sendPrivateMessage', sendPrivateMessage)
+    ctx.set('sendMessage', sendMessage)
   }
 }
 

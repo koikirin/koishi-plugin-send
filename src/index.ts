@@ -62,7 +62,7 @@ async function sendPrivateMessage(this: Context, channel: string | Send.Channel,
   if (!bot) {
     bot = this.bots.find(b => b.platform === platform)
   }
-  bot = await this.serial('send/sendPrivateMessage', this, bot as any, { platform, channelId }, content, options)
+  bot = (await this.serial('send/sendPrivateMessage', this, bot as any, { platform, channelId }, content, options)) || bot
   if (bot) return await bot.sendPrivateMessage(channelId, content, '', options)
 }
 
@@ -75,7 +75,7 @@ async function sendMessage(this: Context, channel: string | Send.Channel, conten
     bot ||= this.bots[`${platform}:${assignee}`]
     bot ||= this.bots.find(b => b.platform === platform)
   }
-  bot = await this.serial('send/sendMessage', this, bot as any, { platform, channelId }, content, guildId, options)
+  bot = (await this.serial('send/sendMessage', this, bot as any, { platform, channelId }, content, guildId, options)) || bot
   if (bot) return await bot.sendMessage(channelId, content, guildId, options)
 }
 

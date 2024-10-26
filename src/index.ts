@@ -50,35 +50,34 @@ class Send {
   static inject = ['database']
 
   constructor(ctx: Context) {
+    async function sendPrivateMessage(this: Context, channel: string | Send.Channel, content: Fragment, options: Universal.SendOptions = {}) {
+      let bot: Bot
+      const [platform, channelId] = parsePlatform(channel)
+      if (platform.includes(':')) { bot = this.bots[platform] }
+      if (!bot) {
+        bot = this.bots.find(b => b.platform === platform)
+      }
+      bot = (await this.serial('send/sendPrivateMessage', this, bot as any, { platform, channelId }, content, options)) || bot
+      if (bot) return await bot.sendPrivateMessage(channelId, content, '', options)
+    }
+
+    async function sendMessage(this: Context, channel: string | Send.Channel, content: Fragment, guildId?: string, options: Universal.SendOptions = {}) {
+      let bot: Bot
+      const [platform, channelId] = parsePlatform(channel)
+      if (platform.includes(':')) { bot = this.bots[platform] }
+      if (!bot) {
+        const { assignee } = (await ctx.database.getChannel(platform, channelId, ['assignee'])) || {}
+        bot ||= this.bots[`${platform}:${assignee}`]
+        bot ||= this.bots.find(b => b.platform === platform)
+      }
+      bot = (await this.serial('send/sendMessage', this, bot as any, { platform, channelId }, content, guildId, options)) || bot
+      if (bot) return await bot.sendMessage(channelId, content, guildId, options)
+    }
+
     ctx.set('sendPrivateMessage', sendPrivateMessage)
     ctx.set('sendMessage', sendMessage)
   }
 }
-
-async function sendPrivateMessage(this: Context, channel: string | Send.Channel, content: Fragment, options: Universal.SendOptions = {}) {
-  let bot: Bot
-  const [platform, channelId] = parsePlatform(channel)
-  if (platform.includes(':')) { bot = this.bots[platform] }
-  if (!bot) {
-    bot = this.bots.find(b => b.platform === platform)
-  }
-  bot = (await this.serial('send/sendPrivateMessage', this, bot as any, { platform, channelId }, content, options)) || bot
-  if (bot) return await bot.sendPrivateMessage(channelId, content, '', options)
-}
-
-async function sendMessage(this: Context, channel: string | Send.Channel, content: Fragment, guildId?: string, options: Universal.SendOptions = {}) {
-  let bot: Bot
-  const [platform, channelId] = parsePlatform(channel)
-  if (platform.includes(':')) { bot = this.bots[platform] }
-  if (!bot) {
-    const { assignee } = (await this.database.getChannel(platform, channelId, ['assignee'])) || {}
-    bot ||= this.bots[`${platform}:${assignee}`]
-    bot ||= this.bots.find(b => b.platform === platform)
-  }
-  bot = (await this.serial('send/sendMessage', this, bot as any, { platform, channelId }, content, guildId, options)) || bot
-  if (bot) return await bot.sendMessage(channelId, content, guildId, options)
-}
-
 namespace Send {
   export interface Config {}
 
